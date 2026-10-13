@@ -71,9 +71,10 @@ public class LoginActivity extends AppCompatActivity {
                 btnLogin.setText("ĐĂNG NHẬP");
                 
                 if (response.isSuccessful() && response.body() != null && response.body().getAccessToken() != null) {
-                    Toast.makeText(LoginActivity.this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
-                    // Chuyển sang trang chủ
-                    startActivity(new Intent(LoginActivity.this, HomeActivity.class));
+                    // Xóa cache bài hát khám phá ngẫu nhiên cũ để random danh sách mới cho lần đăng nhập này
+                    HomeFragment.clearDiscoverCache();
+                    // Chuyển sang MainActivity
+                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
                     finish(); 
                 } else {
                     try {

@@ -55,13 +55,20 @@ public class LibraryManager {
         String json = prefs.getString(KEY_SONGS, null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<Song>>(){}.getType();
-        return gson.fromJson(json, type);
+        List<Song> songs = gson.fromJson(json, type);
+        if (songs != null) {
+            for (Song s : songs) {
+                s.setConfidence(0);
+            }
+            return songs;
+        }
+        return new ArrayList<>();
     }
 
     // Thêm hoặc xóa bài hát khỏi thư viện
     public boolean toggleLike(Song song) {
+        if (song == null) return false;
         List<Song> songs = getLikedSongs();
-        boolean isLiked = false;
         
         for (int i = 0; i < songs.size(); i++) {
             if (songs.get(i).getTitle().equals(song.getTitle())) {
@@ -71,6 +78,8 @@ public class LibraryManager {
             }
         }
         
+        // Reset confidence về 0 trước khi lưu vào thư viện
+        song.setConfidence(0);
         songs.add(song);
         saveSongs(songs);
         return true; // Đã thêm

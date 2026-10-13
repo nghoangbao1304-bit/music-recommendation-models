@@ -1,16 +1,19 @@
 package com.example.myapplication.model;
 
 import java.util.List;
+import java.util.Map;
+
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.Header;
+import retrofit2.http.PATCH;
 import retrofit2.http.POST;
 import retrofit2.http.Query;
 
 public interface SupabaseApi {
-    // Lấy danh sách toàn bộ nhạc
-    @GET("rest/v1/songs?select=*")
+    // Lấy danh sách toàn bộ nhạc, sắp xếp theo lượt view giảm dần (nhiều view nhất lên đầu)
+    @GET("rest/v1/songs?select=*&order=mpd_playlist_count.desc")
     Call<List<Song>> getSongs(
         @Header("apikey") String apiKey,
         @Header("Authorization") String auth
@@ -30,6 +33,15 @@ public interface SupabaseApi {
         @Header("apikey") String apiKey,
         @Header("Authorization") String auth,
         @Query(value = "artist", encoded = true) String artistQuery
+    );
+
+    // Cập nhật lượt nghe (view)
+    @PATCH("rest/v1/songs")
+    Call<Void> updateSongViews(
+        @Header("apikey") String apiKey,
+        @Header("Authorization") String auth,
+        @Query(value = "song_id", encoded = true) String songIdQuery, // vd: "eq.123"
+        @Body Map<String, Integer> body
     );
 
     // API Đăng ký

@@ -3,7 +3,10 @@ package com.example.myapplication.model;
 import android.util.Log;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -18,6 +21,17 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
     private SupabaseApi api;
     private List<Song> cachedSongs;
 
+    public Song getSongFromCache(String title) {
+        if (cachedSongs != null && title != null) {
+            for (Song s : cachedSongs) {
+                if (title.equalsIgnoreCase(s.getTitle())) {
+                    return s;
+                }
+            }
+        }
+        return null;
+    }
+
     public SupabaseRecommendationModel() {
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(SUPABASE_URL)
@@ -29,11 +43,12 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
     @Override
     public void getTopTracks(DataCallback<List<Song>> callback) {
         String bearerAuth = "Bearer " + SUPABASE_ANON_KEY;
+        // Thêm tham số order để luôn lấy danh sách được sắp xếp theo lượt view giảm dần (Mới nhất)
         api.getSongs(SUPABASE_ANON_KEY, bearerAuth).enqueue(new Callback<List<Song>>() {
             @Override
             public void onResponse(Call<List<Song>> call, Response<List<Song>> response) {
                 if (response.isSuccessful() && response.body() != null) {
-                    cachedSongs = response.body();
+                    cachedSongs = response.body(); // Cập nhật lại Cache mới nhất
                     callback.onSuccess(cachedSongs);
                 } else {
                     callback.onError("Lỗi API: " + response.code());
@@ -42,7 +57,12 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
 
             @Override
             public void onFailure(Call<List<Song>> call, Throwable t) {
-                callback.onError("Lỗi mạng: " + t.getMessage());
+                // Nếu rớt mạng thì mới xài đồ cũ trong Cache
+                if (cachedSongs != null && !cachedSongs.isEmpty()) {
+                    callback.onSuccess(cachedSongs);
+                } else {
+                    callback.onError("Lỗi mạng: " + t.getMessage());
+                }
             }
         });
     }
@@ -101,9 +121,11 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
                     List<Song> recommendedSongs = new ArrayList<>();
                     for (AiRecommendationApi.AiRecommendation rec : response.body().recommendations) {
                         for (Song song : cachedSongs) {
-                            // Sửa lại logic so sánh Tên bài hát cho chắc chắn khớp (Bỏ qua hoa thường và trim)
-                            if (song.getTitle() != null && song.getTitle().trim().equalsIgnoreCase(rec.title.trim())) {
+
+                            if (isTitleMatch(song.getTitle(), rec.title)) {
                                 Song recSong = new Song(song.getSongId(), song.getTitle(), rec.artist != null ? rec.artist : song.getArtist(), song.getAudioUrl());
+                                recSong.setImageUrl(song.getImageUrl());
+                                recSong.setViewCount(song.getViewCount());
                                 recSong.setConfidence(rec.probability);
                                 recommendedSongs.add(recSong);
                                 break;
@@ -114,7 +136,7 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
                         callback.onSuccess(recommendedSongs);
                     } else {
                         // In log nếu AI trả về nhưng lại không khớp được với bài nào trong DB Supabase
-                        Log.e("SupabaseModel", "AI trả về nhưng không khớp bài nào trong Database!");
+                        Log.e("SupabaseModel", "AI trả về nhưng không khớp bài nào trong Database, lấy ngẫu nhiên fallback!");
                         callback.onSuccess(getRandomSongs(cachedSongs, 5));
                     }
                 } else {
@@ -129,6 +151,19 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
                 callback.onSuccess(getRandomSongs(cachedSongs, 5));
             }
         });
+    }
+
+    private boolean isTitleMatch(String title1, String title2) {
+        if (title1 == null || title2 == null) return false;
+        
+        // Chuẩn hóa: chữ thường, loại bỏ tất cả dấu câu và ký tự đặc biệt
+        String norm1 = title1.toLowerCase().replaceAll("[^a-zA-Z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]", "");
+        String norm2 = title2.toLowerCase().replaceAll("[^a-zA-Z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]", "");
+        
+        if (norm1.equals(norm2)) return true;
+        if (!norm1.isEmpty() && !norm2.isEmpty() && (norm1.contains(norm2) || norm2.contains(norm1))) return true;
+        
+        return false;
     }
 
     private List<Song> getRandomSongs(List<Song> source, int count) {
@@ -193,6 +228,42 @@ public class SupabaseRecommendationModel implements IRecommendationModel {
             @Override
             public void onFailure(Call<List<Song>> call, Throwable t) {
                 callback.onError("Mất kết nối mạng");
+            }
+        });
+    }
+
+    public void incrementSongView(Song song) {
+        if (song == null || song.getSongId() == null) return;
+        
+        // Cập nhật ngay trong cache RAM để khi AI lấy bài hát tương tự sẽ có ViewCount mới nhất
+        if (cachedSongs != null) {
+            for (Song s : cachedSongs) {
+                if (song.getSongId().equals(s.getSongId())) {
+                    s.setViewCount(song.getViewCount());
+                    break;
+                }
+            }
+        }
+        
+        String bearerAuth = "Bearer " + SUPABASE_ANON_KEY;
+        String filter = "eq." + song.getSongId();
+        
+        Map<String, Integer> updateBody = new HashMap<>();
+        // Truyền thẳng số ViewCount đã được cộng 1 từ bên Controller xuống DB
+        updateBody.put("mpd_playlist_count", song.getViewCount()); 
+        
+        api.updateSongViews(SUPABASE_ANON_KEY, bearerAuth, filter, updateBody).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Log.d("Supabase", "Cập nhật lượt nghe thành công: " + song.getTitle());
+                } else {
+                    Log.e("Supabase", "Lỗi cập nhật lượt nghe Code: " + response.code());
+                }
+            }
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Log.e("Supabase", "Lỗi cập nhật lượt nghe: " + t.getMessage());
             }
         });
     }

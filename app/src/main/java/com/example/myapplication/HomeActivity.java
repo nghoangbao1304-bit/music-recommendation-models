@@ -88,6 +88,7 @@ public class HomeActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadRecentSongs();
+        loadTopTracks();
     }
 
     private void loadRecentSongs() {

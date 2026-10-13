@@ -5,6 +5,7 @@ import java.util.List;
 import retrofit2.Call;
 import retrofit2.http.GET;
 import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public interface AiRecommendationApi {
     
@@ -43,4 +44,37 @@ public interface AiRecommendationApi {
 
     @GET("recommend_artist/{artist_name}")
     Call<AiArtistResponse> getRelatedArtistsFromAI(@Path("artist_name") String artistName);
+}
+
+// === THÊM INTERFACE CHO LAST.FM API ===
+interface LastFmApi {
+    @GET("?method=track.getInfo&format=json")
+    Call<LastFmResponse> getTrackInfo(
+            @Query("api_key") String apiKey,
+            @Query("artist") String artist,
+            @Query("track") String track
+    );
+
+    class LastFmResponse {
+        @SerializedName("track")
+        public TrackInfo track;
+    }
+
+    class TrackInfo {
+        @SerializedName("album")
+        public Album album;
+    }
+
+    class Album {
+        @SerializedName("image")
+        public List<ImageInfo> image;
+    }
+
+    class ImageInfo {
+        @SerializedName("#text")
+        public String url;
+        
+        @SerializedName("size")
+        public String size;
+    }
 }

@@ -59,6 +59,13 @@ dependencies {
     // TabLayout
     implementation("androidx.viewpager2:viewpager2:1.0.0")
 
+    // Glide - Thư viện tải ảnh siêu tốc của Google
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+    
+    // Thư viện Material Design cho Input, Toggle Mật khẩu
+    implementation("com.google.android.material:material:1.11.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

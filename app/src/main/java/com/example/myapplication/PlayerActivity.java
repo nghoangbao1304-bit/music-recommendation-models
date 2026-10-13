@@ -17,23 +17,37 @@ import android.widget.Toast;
 import com.example.myapplication.adapter.ArtistAdapter;
 import com.example.myapplication.adapter.SongAdapter;
 import com.example.myapplication.controller.MusicPlayerController;
+import com.example.myapplication.controller.MusicPlayerManager;
 import com.example.myapplication.model.IRecommendationModel;
 import com.example.myapplication.model.SupabaseRecommendationModel;
 import com.example.myapplication.model.Song;
 import com.example.myapplication.view.IMusicView;
 import com.example.myapplication.model.LibraryManager;
 
+import java.lang.reflect.Method;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 import com.example.myapplication.model.AiRecommendationApi;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.bitmap.CenterCrop;
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
+import com.bumptech.glide.request.RequestOptions;
 
 public class PlayerActivity extends AppCompatActivity implements IMusicView {
 
-    private TextView tvTitle, tvArtist, tvCurrentTime, tvTotalTime, tabSongs, tabArtists;
+    private static final String LAST_FM_API_KEY = "4a9f5581a9cdf20a699f540ac52a95c9";
+
+    private TextView tvTitle, tvArtist, tvViewCount, tvCurrentTime, tvTotalTime, tabSongs, tabArtists;
     private ImageButton btnPlayPause, btnNext, btnPrev, btnLike, btnRepeat;
-    private ImageView btnBack;
+    private ImageView btnBack, ivAlbumArt;
     private SeekBar seekBar;
     private RecyclerView rvRecommendations, rvArtistRecommendations;
 
@@ -51,6 +65,7 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
         // Ánh xạ UI
         tvTitle = findViewById(R.id.tvTitle);
         tvArtist = findViewById(R.id.tvArtist);
+        tvViewCount = findViewById(R.id.tvViewCount);
         tvCurrentTime = findViewById(R.id.tvCurrentTime);
         tvTotalTime = findViewById(R.id.tvTotalTime);
         btnPlayPause = findViewById(R.id.btnPlayPause);
@@ -60,6 +75,7 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
         btnRepeat = findViewById(R.id.btnRepeat);
         seekBar = findViewById(R.id.seekBar);
         btnBack = findViewById(R.id.btnBack);
+        ivAlbumArt = findViewById(R.id.ivAlbumArt);
 
         tabSongs = findViewById(R.id.tabSongs);
         tabArtists = findViewById(R.id.tabArtists);
@@ -99,9 +115,9 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
 
                 AiRecommendationApi aiApi = aiRetrofit.create(AiRecommendationApi.class);
 
-                aiApi.getRelatedArtistsFromAI(mainArtist).enqueue(new retrofit2.Callback<AiRecommendationApi.AiArtistResponse>() {
+                aiApi.getRelatedArtistsFromAI(mainArtist).enqueue(new Callback<AiRecommendationApi.AiArtistResponse>() {
                     @Override
-                    public void onResponse(retrofit2.Call<AiRecommendationApi.AiArtistResponse> call, retrofit2.Response<AiRecommendationApi.AiArtistResponse> response) {
+                    public void onResponse(Call<AiRecommendationApi.AiArtistResponse> call, Response<AiRecommendationApi.AiArtistResponse> response) {
                         if (response.isSuccessful() && response.body() != null && response.body().relatedArtists != null) {
                             
                             // TRUYỀN THẲNG DANH SÁCH TỪ API SANG ADAPTER
@@ -117,7 +133,7 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
                     }
 
                     @Override
-                    public void onFailure(retrofit2.Call<AiRecommendationApi.AiArtistResponse> call, Throwable t) {
+                    public void onFailure(Call<AiRecommendationApi.AiArtistResponse> call, Throwable t) {
                         fallbackToSongArtists();
                     }
                 });
@@ -139,8 +155,8 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
         });
 
         // DÙNG SUPABASE VÀ EXOPLAYER
-        IRecommendationModel model = new SupabaseRecommendationModel();
-        controller = new MusicPlayerController(this, model, this);
+        controller = MusicPlayerManager.getInstance(this).getController();
+        controller.registerView(this);
 
         btnNext.setOnClickListener(v -> controller.playNextSong());
         btnPrev.setOnClickListener(v -> controller.playPreviousSong());
@@ -155,7 +171,7 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
                 Toast.makeText(this, "Phát ngẫu nhiên bài tiếp theo", Toast.LENGTH_SHORT).show();
             }
         });
-
+        
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -174,11 +190,16 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
             }
         });
 
+        // Xử lý nhạc
+        boolean openFromMini = getIntent().getBooleanExtra("OPEN_FROM_MINI", false);
         Song initialSong = (Song) getIntent().getSerializableExtra("SONG");
-        if (initialSong != null) {
-            controller.playSong(initialSong);
-        } else {
-            controller.playNextSong();
+        
+        if (initialSong != null && !openFromMini) {
+            controller.playSong(initialSong); 
+        } else if (controller.getCurrentSong() != null) {
+            // Nếu mở từ mini player, load lại thông tin hiện tại
+            displaySongInfo(controller.getCurrentSong());
+            updatePlayState(controller.isPlaying());
         }
     }
 
@@ -188,7 +209,27 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
         runOnUiThread(() -> {
             tvTitle.setText(song.getTitle());
             tvArtist.setText(song.getArtist());
+            
+            // Format lượt view (vd: 12000 -> 12,000)
+            String formattedViews = NumberFormat.getNumberInstance(Locale.US).format(song.getViewCount());
+            tvViewCount.setText(formattedViews + " lượt nghe");
+            
             updateLikeIcon(libraryManager.isLiked(song));
+
+            // Logic lấy ảnh CỰC TỐI ƯU: 
+            // Nếu Supabase có link ảnh (song.getImageUrl() != null) thì tải bằng Glide.
+            // Nếu chưa có (hoặc lỗi), dùng cơ chế tạo ảnh Avatar UI dự phòng tuyệt đẹp.
+            String imageUrl = song.getImageUrl();
+            if (imageUrl == null || imageUrl.trim().isEmpty()) {
+                imageUrl = "https://ui-avatars.com/api/?name=" + song.getTitle() + "&background=random&color=fff&size=512&font-size=0.4&bold=true";
+            }
+            
+            Glide.with(this)
+                 .load(imageUrl)
+                 .apply(new RequestOptions().transform(new CenterCrop(), new RoundedCorners(32)))
+                 .placeholder(R.drawable.bg_album_placeholder)
+                 .error(R.drawable.bg_album_placeholder)
+                 .into(ivAlbumArt);
 
             // Cập nhật lại tab Ca sĩ nếu đang mở
             if (rvArtistRecommendations.getVisibility() == View.VISIBLE) {
@@ -233,10 +274,14 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
         runOnUiThread(() -> {
             if (recommendedSongs != null && !recommendedSongs.isEmpty()) {
                 currentRecommendedSongs = recommendedSongs;
-                SongAdapter adapter = new SongAdapter(recommendedSongs, song -> {
-                    controller.playSong(song);
-                });
-                rvRecommendations.setAdapter(adapter);
+                if (rvRecommendations.getAdapter() instanceof SongAdapter) {
+                    ((SongAdapter) rvRecommendations.getAdapter()).updateData(recommendedSongs);
+                } else {
+                    SongAdapter adapter = new SongAdapter(recommendedSongs, true, song -> {
+                        controller.playSong(song);
+                    });
+                    rvRecommendations.setAdapter(adapter);
+                }
             }
         });
     }
@@ -252,7 +297,9 @@ public class PlayerActivity extends AppCompatActivity implements IMusicView {
     protected void onDestroy() {
         super.onDestroy();
         if (controller != null) {
-            controller.release();
+            // Chỉ gỡ View hiện tại ra khỏi Controller để không bị rò rỉ bộ nhớ.
+            // TUYỆT ĐỐI KHÔNG GỌI release() ở đây vì nhạc cần tiếp tục phát ngầm cho Mini Player
+            controller.unregisterView(this);
         }
     }
 
