@@ -7,4 +7,3 @@
 | **`benchmark_latency_100_runs.csv`** | `.csv` | **Nhật ký đo đạc độ trễ 100 lần lặp**: Dữ liệu thực nghiệm chi tiết phục vụ Bảng 4.1A, 4.3A và 4.9A trong Khóa luận. |
 | **`artist_signals_v2.csv`** | `.csv` | **Tập dữ liệu tín hiệu Ca sĩ (Artist v2)**: 1.708 cặp quan hệ ca sĩ với các đặc trưng tương đồng Jaccard, Lift score và xác suất chuyển tiếp nghệ sĩ. |
 | `community_signal_daily_features_clean.csv` | `.csv` | Tập mẫu dữ liệu bài hát 5.000 dòng sạch dùng trực tiếp để huấn luyện và kiểm thử. |
-| `lightgbm_model2_tuned.pkl` | `.pkl` | Trọng số mô hình xếp hạng bài hát LightGBM tối ưu cho API. |
