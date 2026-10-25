@@ -1,5 +1,5 @@
 ### 📂 Danh mục tài nguyên thực nghiệm trên Google Drive:
-
+[![Google Drive Folder](https://img.shields.io/badge/Google%20Drive-Tải%20Toàn%20Bộ%20Thực%20Nghiệm-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)]
 | Thư mục / Tệp tin | Định dạng | Nội dung mô tả |
 | :--- | :---: | :--- |
 | **`TongHop_ThucNghiem_KhoaLuan.ipynb`** | `.ipynb` | **Sổ tay thực nghiệm chuẩn hóa (Khóa luận)**: Toàn bộ 10 phần thực nghiệm, GroupKFold 5-Fold trên 6 mô hình, kiểm chứng Held-out, kiểm định McNemar và Cluster-Bootstrap 2.000 lần. |
