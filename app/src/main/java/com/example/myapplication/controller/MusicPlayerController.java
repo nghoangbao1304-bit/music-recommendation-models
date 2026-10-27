@@ -268,10 +268,6 @@ public class MusicPlayerController {
             }
             
             url = url.trim();
-            if (url.startsWith("http://")) {
-                url = url.replace("http://", "https://");
-            }
-            
             Log.d("MusicController", "Đang phát URL: " + url);
             
             MediaItem mediaItem = MediaItem.fromUri(url);
