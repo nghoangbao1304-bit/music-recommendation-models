@@ -71,6 +71,12 @@ public class LoginActivity extends AppCompatActivity {
                 btnLogin.setText("ĐĂNG NHẬP");
                 
                 if (response.isSuccessful() && response.body() != null && response.body().getAccessToken() != null) {
+                    // Lưu email người dùng hiện tại vào UserSession để phân chia Thư viện và Lịch sử nghe riêng biệt cho từng tài khoản
+                    getSharedPreferences("UserSession", MODE_PRIVATE)
+                            .edit()
+                            .putString("CURRENT_USER_EMAIL", email.toLowerCase().trim())
+                            .apply();
+
                     // Xóa cache bài hát khám phá ngẫu nhiên cũ để random danh sách mới cho lần đăng nhập này
                     HomeFragment.clearDiscoverCache();
                     // Chuyển sang MainActivity

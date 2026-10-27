@@ -11,19 +11,38 @@ import java.util.List;
 public class LibraryManager {
     private static final String PREF_NAME = "MusicLibrary";
     private static final String KEY_SONGS = "LikedSongs";
+    private static final String KEY_RECENT = "RecentSongs";
+
+    private final Context context;
     private final SharedPreferences prefs;
     private final Gson gson;
 
-    private static final String KEY_RECENT = "RecentSongs";
-
     public LibraryManager(Context context) {
-        prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        gson = new Gson();
+        this.context = context != null ? context.getApplicationContext() : null;
+        this.prefs = this.context != null ? this.context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE) : null;
+        this.gson = new Gson();
+    }
+
+    // Lấy Key phân chia riêng biệt cho từng tài khoản Email
+    private String getLikedKey() {
+        if (context == null) return KEY_SONGS + "_default";
+        SharedPreferences userPrefs = context.getSharedPreferences("UserSession", Context.MODE_PRIVATE);
+        String email = userPrefs.getString("CURRENT_USER_EMAIL", "default_user");
+        String sanitized = email.replaceAll("[^a-zA-Z0-9]", "_");
+        return KEY_SONGS + "_" + sanitized;
+    }
+
+    private String getRecentKey() {
+        if (context == null) return KEY_RECENT + "_default";
+        SharedPreferences userPrefs = context.getSharedPreferences("UserSession", Context.MODE_PRIVATE);
+        String email = userPrefs.getString("CURRENT_USER_EMAIL", "default_user");
+        String sanitized = email.replaceAll("[^a-zA-Z0-9]", "_");
+        return KEY_RECENT + "_" + sanitized;
     }
 
     // --- LỊCH SỬ NGHE GẦN ĐÂY ---
     public void addRecentSong(Song song) {
-        if (song == null) return;
+        if (song == null || prefs == null) return;
         List<Song> recents = getRecentSongs();
         
         // Xóa bài hát cũ nếu đã tồn tại để đẩy nó lên đầu danh sách
@@ -40,19 +59,22 @@ public class LibraryManager {
         if (recents.size() > 15) {
             recents = recents.subList(0, 15);
         }
-        prefs.edit().putString(KEY_RECENT, gson.toJson(recents)).apply();
+        prefs.edit().putString(getRecentKey(), gson.toJson(recents)).apply();
     }
 
     public List<Song> getRecentSongs() {
-        String json = prefs.getString(KEY_RECENT, null);
+        if (prefs == null) return new ArrayList<>();
+        String json = prefs.getString(getRecentKey(), null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<Song>>(){}.getType();
-        return gson.fromJson(json, type);
+        List<Song> recents = gson.fromJson(json, type);
+        return recents != null ? recents : new ArrayList<>();
     }
 
     // --- BÀI HÁT YÊU THÍCH ---
     public List<Song> getLikedSongs() {
-        String json = prefs.getString(KEY_SONGS, null);
+        if (prefs == null) return new ArrayList<>();
+        String json = prefs.getString(getLikedKey(), null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<Song>>(){}.getType();
         List<Song> songs = gson.fromJson(json, type);
@@ -67,7 +89,7 @@ public class LibraryManager {
 
     // Thêm hoặc xóa bài hát khỏi thư viện
     public boolean toggleLike(Song song) {
-        if (song == null) return false;
+        if (song == null || prefs == null) return false;
         List<Song> songs = getLikedSongs();
         
         for (int i = 0; i < songs.size(); i++) {
@@ -96,6 +118,7 @@ public class LibraryManager {
     }
 
     private void saveSongs(List<Song> songs) {
-        prefs.edit().putString(KEY_SONGS, gson.toJson(songs)).apply();
+        if (prefs == null) return;
+        prefs.edit().putString(getLikedKey(), gson.toJson(songs)).apply();
     }
 }
